@@ -11,6 +11,7 @@ function Upload() {
   const [fileContent, setFileContent] = useState(null);
   const [rdfGraph, setRdfGraph] = useState(null); // Zustand für den RDF-Graphen
   const [graphData, setGraphData] = useState(null); // Zustand für die Graphendaten
+  const [classes, setClasses] = useState([]);
 
   useEffect(() => {
     if (data) {
@@ -20,7 +21,7 @@ function Upload() {
 
   useEffect(() => {
     if (rdfGraph) {
-      convertGraphToVisData(rdfGraph);
+    //  convertGraphToVisData(rdfGraph);
     }
   }, [rdfGraph]);
 
@@ -34,57 +35,49 @@ function Upload() {
   };
 
   const parseRdfContent = (rdfData) => {
+    const extClasses = []; // Array zum Speichern der extrahierten Klassen
+  
     console.log('RDF-Daten:', rdfData); // Konsolenausgabe hinzufügen
     const store = rdf.graph();
     const contentType = 'text/turtle'; // Annahme: Das Dateiformat ist Turtle
     const baseUrl = window.location.href; // Basis-URL auf die aktuelle Anwendungs-URL setzen
     rdf.parse(rdfData, store, baseUrl, contentType, (err, rdfGraph) => {
       if (err) {
-        console.error('Fehler beim Parsen der RDF-Datei:', err);
+        console.error('Parsing failed:', err);
         return;
       }
-      console.log('RDF-Datei erfolgreich geparst.');
+      console.log('file successfully parsed');
   
-      // Ausgabe der Tripel in der Konsole
-      rdfGraph.statements.forEach((statement, index) => {
-        console.log(`Triple ${index + 1}:`);
-        console.log('Subject:', statement.subject.value);
-        console.log('Predicate:', statement.predicate.value);
-        console.log('Object:', statement.object.value);
-        console.log('---');
+      // Durchlaufe die Tripel, um die Klassen zu extrahieren
+      rdfGraph.statements.forEach((statement) => {
+        if (
+          statement.predicate.value === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type' && // Prüfe, ob das Prädikat 'rdf:type' ist
+          statement.object.value === 'http://www.w3.org/2002/07/owl#Class' // Prüfe, ob das Objekt 'owl:Class' ist
+          //statement.subject.termType === 'NamedNode' // Prüfe, ob das Subjekt ein benannter Knoten ist
+        ) {
+          // Extrahiere den Klassennamen aus der URI und füge ihn der Liste hinzu
+          const className = statement.subject.value.split('#').pop();
+          extClasses.push(className);
+        }
       });
-  
+      
       setRdfGraph(rdfGraph); // Speichere den RDF-Graphen im Zustand
+      setClasses(extClasses); // Setze den Zustand für die extrahierten Klassen
     });
   };
-  
 
-  const convertGraphToVisData = (graph) => {
-    const nodes = [];
-    const edges = [];
-    graph.statements.forEach((statement, index) => {
-      const subject = getReadableTerm(statement.subject);
-      const predicate = getReadableTerm(statement.predicate);
-      const object = getReadableTerm(statement.object);
-
-      if (!nodes.find((node) => node.id === subject)) {
-        nodes.push({ id: subject, label: subject });
-      }
-      if (!nodes.find((node) => node.id === object)) {
-        nodes.push({ id: object, label: object });
-      }
-      edges.push({ id: index, from: subject, to: object, label: predicate });
-    });
-    setGraphData({ nodes, edges });
+  const renderClasses = () => {
+    return (
+      <>
+        {classes.map((className) => (
+          <p>{className}</p>
+        ))}
+      </>
+    );
   };
 
-  const getReadableTerm = (term) => {
-    if (term.termType === 'NamedNode') {
-      return term.value.split('#').pop();
-    } else {
-      return term.value;
-    }
-  };
+  console.log(classes); //jetzt muss es nur noch im graphen angezeigt werden, lol!
+
 
   return (
     <>
@@ -98,6 +91,7 @@ function Upload() {
               <div>
                 <p>RDF Graph:</p>
                 <div id="graph-container" style={{ height: '400px' }}></div>
+                {renderClasses()}
               </div>
             )}
           </div>
